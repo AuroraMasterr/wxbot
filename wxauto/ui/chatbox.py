@@ -34,6 +34,7 @@ def truncate_string(s: str, n: int=8) -> str:
     return s if len(s) <= n else s[:n] + '...'
 
 USED_MSG_IDS = {}
+LAST_MSG_COUNT = {}
 
 class ChatBox:
     def __init__(self, control: uia.Control, parent):
@@ -69,6 +70,10 @@ class ChatBox:
         return WECHAT_CHAT_BOX.get(text, {WxParam.LANGUAGE: text}).get(WxParam.LANGUAGE)
     
     def _update_used_msg_ids(self):
+        if not self.msgbox.Exists(0):
+            USED_MSG_IDS[self.id] = tuple()
+            LAST_MSG_COUNT[self.id] = 0
+            return
         USED_MSG_IDS[self.id] = tuple((i.runtimeid for i in self.msgbox.GetChildren()))
     
     # @uilock
@@ -102,7 +107,7 @@ class ChatBox:
 
     @property
     def used_msg_ids(self):
-        print("ID: ", self.id)
+        # print("ID: ", self.id)
         if self.id not in USED_MSG_IDS:
             USED_MSG_IDS[self.id] = tuple()
         return USED_MSG_IDS[self.id]
@@ -351,8 +356,8 @@ class ChatBox:
             self.fzxinit()
         msg_controls = self.msgbox.GetChildren()
         now_msg_ids = tuple((i.runtimeid for i in msg_controls))
-        print(self.used_msg_ids)
-        print(now_msg_ids)
+        # print(self.used_msg_ids)
+        # print(now_msg_ids)
         if not now_msg_ids:  # 当前没有消息id
             return []
         if self._empty and self.used_msg_ids:
@@ -377,7 +382,7 @@ class ChatBox:
         USED_MSG_IDS[self.id] = tuple(self.used_msg_ids + tuple(new))[-100:]
         new_controls = [i for i in msg_controls if i.runtimeid in new]
         self.msgbox.MiddleClick()
-        self._update_used_msg_ids()
+        # self._update_used_msg_ids()
         return [
                 parse_msg(msg_control, self) 
                 for msg_control 

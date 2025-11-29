@@ -1,9 +1,9 @@
 from wxauto import WeChat
-from wxauto.msgs import FriendMessage
+from wxauto.msgs import FriendMessage, SelfMessage
 from wxauto import get_wx_clients
 from wxauto import get_wx_logins
 from wxauto import LoginWnd
-
+from chatgpt import get_reply
 
 def print_now_windows():
     msgs = wx.GetAllMessage()
@@ -22,8 +22,11 @@ def print_sessions():
         print(session.info)
 
 def auto_reply(msg, chat):
-    # send("自动回复", "oh")
-    chat.SendMsg("自动回复")
+    if isinstance(msg, SelfMessage):
+        return
+    if msg.content.startswith(""):
+        reply = "[自动回复] " + get_reply(msg.content)
+        chat.SendMsg(reply)
 
 def addListen(name):
     wx.AddListenChat(nickname=name, callback=auto_reply)
@@ -38,9 +41,6 @@ def login():
 
 if __name__ == "__main__":
     wx = WeChat(debug=True)
-    wx = WeChat(debug=True)
     # addListen("fzx")
     addListen("戒不了色吧")
     wx.KeepRunning()
-
-
