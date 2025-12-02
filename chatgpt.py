@@ -22,7 +22,8 @@ def gen_message(role, m):
     return message
 
 
-system_message = gen_system(type="tech_geek")
+# system_message = gen_system(type="tech_geek")
+system_message = gen_system(type="cat_girl")
 
 history_messages = []
 WINDOW_SIZE = 10

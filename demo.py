@@ -1,5 +1,5 @@
 from wxauto import WeChat
-from wxauto.msgs import FriendMessage, SelfMessage
+from wxauto.msgs import FriendMessage, SelfMessage, SystemMessage
 from wxauto import get_wx_clients
 from wxauto import get_wx_logins
 from wxauto import LoginWnd
@@ -11,8 +11,8 @@ def print_now_windows():
         print('==' * 30)
         print(f"{msg.sender}: {msg.content}")
 
-def send(message, name="戒不了色吧"):
-    wx.SendMsg(message, who=name)
+def send(message, name="戒不了色吧", members=None):
+    wx.SendMsg(message, who=name, at=members)
     print(f"Send Success to {name}:\n\t{message}")
 
 def print_sessions():
@@ -21,12 +21,35 @@ def print_sessions():
     for session in sessions:
         print(session.info)
 
+def handle_message(message):
+    message = message.replace("@fzxbot", "")
+    message = message.replace("@fzx", "")
+    return message
+
+def check_message(msg, chat):
+    if msg.attr != "friend":
+        return False
+    if msg.type != "text" and msg.type != "quote":
+        return False
+    # 群聊里需要 @fzx
+    # return True
+    if chat.chat_type == "group" and not "@fzx" in msg.content:
+        return False
+    return True
+
 def auto_reply(msg, chat):
-    if isinstance(msg, SelfMessage):
-        return
-    if msg.content.startswith(""):
-        reply = "[自动回复] " + get_reply(msg.content)
-        chat.SendMsg(reply)
+    if check_message(msg, chat):
+        # members = chat._api.get_group_members()
+        # message = "群聊里所有人为："
+        # for member in members:
+        #     message += member+" "
+        # msg.quote(message)
+        # return
+
+        content = handle_message(msg.content)
+        reply = "[自动回复] " + get_reply(content)
+        msg.quote(reply)            # 引用消息
+        # chat.SendMsg(reply)
 
 def addListen(name):
     wx.AddListenChat(nickname=name, callback=auto_reply)
@@ -42,5 +65,6 @@ def login():
 if __name__ == "__main__":
     wx = WeChat(debug=True)
     # addListen("fzx")
-    addListen("戒不了色吧")
+    addListen("什么档次和我一组")
+    # addListen("戒不了色吧")
     wx.KeepRunning()

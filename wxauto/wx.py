@@ -325,7 +325,7 @@ class Chat:
         """
         if not hasattr(self, '_last_chat'):
             self._last_chat = self.ChatInfo().get('chat_name')
-        print(self.ChatInfo())
+        # print(self.ChatInfo())
         if (_last_chat := self.ChatInfo().get('chat_name')) != self._last_chat:
             self._last_chat = _last_chat
             self._api._chat_api._update_used_msg_ids()
@@ -514,7 +514,7 @@ class WeChat(Chat, Listener):
                 continue
             with self._lock:
                 msgs = chat.GetNewMessage()
-                print("新消息：", msgs)
+                # print("新消息：", msgs)
                 for msg in msgs:
                     wxlog.debug(f"[{msg.attr} {msg.type}]获取到新消息：{who} - {msg.content}")
                     self._excutor.submit(self._safe_callback, callback, msg, chat)
