@@ -1,6 +1,6 @@
 import os
 import openai
-from prompt import tech_geek_prompt, cat_girl_prompt
+from prompt import prompts
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.base_url = os.environ["OPENAI_URL"]
@@ -9,10 +9,7 @@ openai.default_headers = {"x-foo": "true"}
 def gen_system(type="tech_geek"):
     system_message = dict()
     system_message["role"]="system"
-    if type == "tech_geek":
-        system_message["content"]=tech_geek_prompt
-    elif type == "cat_girl":
-        system_message["content"]=cat_girl_prompt
+    system_message["content"]=prompts[type]
     return system_message
 
 def gen_message(role, m):
@@ -26,7 +23,11 @@ def gen_message(role, m):
 system_message = gen_system(type="cat_girl")
 
 history_messages = []
-WINDOW_SIZE = 10
+WINDOW_SIZE = 50
+
+def set_system(type):
+    global system_message
+    system_message = gen_system(type)
 
 def update_history(message):
     global history_messages

@@ -3,10 +3,14 @@ from wxauto.msgs import FriendMessage, SelfMessage, SystemMessage
 from wxauto import get_wx_clients
 from wxauto import get_wx_logins
 from wxauto import LoginWnd
-from chatgpt import get_reply
+from chatgpt import get_reply, set_system
+from instruction import instruct_hook
+from utils import handle_message, check_message
 
 def print_now_windows():
+    print("start print")
     msgs = wx.GetAllMessage()
+    print("message", msgs)
     for msg in msgs:
         print('==' * 30)
         print(f"{msg.sender}: {msg.content}")
@@ -21,23 +25,9 @@ def print_sessions():
     for session in sessions:
         print(session.info)
 
-def handle_message(message):
-    message = message.replace("@fzxbot", "")
-    message = message.replace("@fzx", "")
-    return message
-
-def check_message(msg, chat):
-    if msg.attr != "friend":
-        return False
-    if msg.type != "text" and msg.type != "quote":
-        return False
-    # 群聊里需要 @fzx
-    # return True
-    if chat.chat_type == "group" and not "@fzx" in msg.content:
-        return False
-    return True
-
 def auto_reply(msg, chat):
+    if instruct_hook(msg, chat):
+        return
     if check_message(msg, chat):
         # members = chat._api.get_group_members()
         # message = "群聊里所有人为："
@@ -45,7 +35,7 @@ def auto_reply(msg, chat):
         #     message += member+" "
         # msg.quote(message)
         # return
-
+        set_system("cat_girl")
         content = handle_message(msg.content)
         reply = "[自动回复] " + get_reply(content)
         msg.quote(reply)            # 引用消息
@@ -64,7 +54,8 @@ def login():
 
 if __name__ == "__main__":
     wx = WeChat(debug=True)
-    # addListen("fzx")
-    addListen("什么档次和我一组")
+    # addListen("田亦海")
+    # addListen("什么档次和我一组")
     # addListen("戒不了色吧")
+    addListen("fzx")
     wx.KeepRunning()
