@@ -3,6 +3,7 @@ def handle_message(message):
     message = message.replace("@fzx", "")
     return message
 
+
 def check_message(msg, chat):
     if msg.attr != "friend":
         return False

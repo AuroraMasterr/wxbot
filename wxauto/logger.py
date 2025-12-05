@@ -11,16 +11,17 @@ import io
 # # 初始化 colorama
 colorama.init()
 
-if hasattr(sys.stdout, 'buffer'):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='ignore')
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="ignore")
 
 LOG_COLORS = {
-    'DEBUG': colorama.Fore.CYAN,
-    'INFO': colorama.Fore.GREEN,
-    'WARNING': colorama.Fore.YELLOW,
-    'ERROR': colorama.Fore.RED,
-    'CRITICAL': colorama.Fore.MAGENTA
+    "DEBUG": colorama.Fore.CYAN,
+    "INFO": colorama.Fore.GREEN,
+    "WARNING": colorama.Fore.YELLOW,
+    "ERROR": colorama.Fore.RED,
+    "CRITICAL": colorama.Fore.MAGENTA,
 }
+
 
 class ColoredFormatter(logging.Formatter):
     def format(self, record):
@@ -28,8 +29,9 @@ class ColoredFormatter(logging.Formatter):
         message = super().format(record)
         return f"{LOG_COLORS[levelname]}{message}{colorama.Style.RESET_ALL}"
 
+
 class WxautoLogger:
-    name: str = 'wxauto'
+    name: str = "wxauto"
 
     def __init__(self):
         self.logger = self.setup_logger()
@@ -43,25 +45,22 @@ class WxautoLogger:
         root_logger.setLevel(logging.DEBUG)
 
         # 添加asyncio日志过滤
-        logging.getLogger('asyncio').setLevel(logging.WARNING)
+        logging.getLogger("asyncio").setLevel(logging.WARNING)
 
         # 设置第三方库的日志级别
-        logging.getLogger('comtypes').setLevel(logging.WARNING)
-        logging.getLogger('urllib3').setLevel(logging.WARNING)
-        logging.getLogger('requests').setLevel(logging.WARNING)
+        logging.getLogger("comtypes").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("requests").setLevel(logging.WARNING)
 
         # 清除现有处理器
         root_logger.handlers.clear()
 
         # 格式
-        fmt = '%(asctime)s [%(name)s] [%(levelname)s] [%(filename)s:%(lineno)d]  %(message)s'
-        
+        fmt = "%(asctime)s [%(name)s] [%(levelname)s] [%(filename)s:%(lineno)d]  %(message)s"
+
         # 控制台处理器（带颜色）
         self.console_handler = logging.StreamHandler()
-        console_formatter = ColoredFormatter(
-            fmt=fmt,
-            datefmt="%Y-%m-%d %H:%M:%S"
-        )
+        console_formatter = ColoredFormatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S")
         self.console_handler.setFormatter(console_formatter)
         self.console_handler.setLevel(logging.DEBUG)
 
@@ -82,10 +81,10 @@ class WxautoLogger:
         current_time = datetime.now().strftime("%Y%m%d")
         log_file = log_dir / f"app_{current_time}.log"
 
-        self.file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        self.file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_formatter = logging.Formatter(
-            '%(asctime)s [%(name)s] [%(levelname)s] [%(filename)s:%(lineno)d]  %(message)s',
-            datefmt="%Y-%m-%d %H:%M:%S"
+            "%(asctime)s [%(name)s] [%(levelname)s] [%(filename)s:%(lineno)d]  %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
         self.file_handler.setFormatter(file_formatter)
         self.file_handler.setLevel(logging.DEBUG)
@@ -124,6 +123,7 @@ class WxautoLogger:
     def critical(self, msg: str, stacklevel=2, *args, **kwargs):
         self._ensure_file_logger()  # 确保文件日志初始化
         self.logger.critical(msg, *args, stacklevel=stacklevel, **kwargs)
+
 
 # wxlog实例化的地方不再创建文件日志
 wxlog = WxautoLogger()
