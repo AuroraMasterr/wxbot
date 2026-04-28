@@ -2,3 +2,4 @@
 *.pyc
 wxauto_logs
 __pycache__
+start.sh

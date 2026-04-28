@@ -1,7 +1,9 @@
 ﻿from __future__ import annotations
 
+import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Callable, Optional, Union
 
 
@@ -15,47 +17,18 @@ class Monitor:
     def __init__(
         self,
         job: Callable[[], None],
-        run_at: Optional[str] = None,
         interval: Optional[Union[int, float, timedelta]] = None,
         start_at: Optional[Union[str, datetime]] = None,
         check_interval_seconds: float = 1.0,
-        on_error: Optional[Callable[[Exception], None]] = None,
     ):
-        if (run_at is None) and (interval is None):
-            raise ValueError("Exactly one mode is required: run_at OR interval")
-
         self.job = job
         self.check_interval_seconds = max(0.2, check_interval_seconds)
-        self.on_error = on_error
 
-        self.run_at = run_at
         self.interval_seconds: Optional[float] = None
         self.next_run: Optional[datetime] = None
 
-        if run_at is not None:
-            self.target_hour, self.target_minute, self.target_second = self._parse_clock_time(run_at)
-        else:
-            self.interval_seconds = self._parse_interval_seconds(interval)
-            self.next_run = self._parse_start_time(start_at)
-
-    @staticmethod
-    def _parse_clock_time(value: str) -> tuple[int, int, int]:
-        parts = value.split(":")
-        if len(parts) not in (2, 3):
-            raise ValueError("run_at must be 'HH:MM' or 'HH:MM:SS'")
-
-        hour = int(parts[0])
-        minute = int(parts[1])
-        second = int(parts[2]) if len(parts) == 3 else 0
-
-        if not (0 <= hour <= 23):
-            raise ValueError("hour must be in [0, 23]")
-        if not (0 <= minute <= 59):
-            raise ValueError("minute must be in [0, 59]")
-        if not (0 <= second <= 59):
-            raise ValueError("second must be in [0, 59]")
-
-        return hour, minute, second
+        self.interval_seconds = self._parse_interval_seconds(interval)
+        self.next_run = self._parse_start_time(start_at)
 
     @staticmethod
     def _parse_interval_seconds(interval: Optional[Union[int, float, timedelta]]) -> float:
@@ -77,62 +50,70 @@ class Monitor:
             return start_at
         return datetime.fromisoformat(start_at)
 
-    def _next_daily_run_time(self, now: Optional[datetime] = None) -> datetime:
-        now = now or datetime.now()
-        target_today = now.replace(
-            hour=self.target_hour,
-            minute=self.target_minute,
-            second=self.target_second,
-            microsecond=0,
-        )
-        if now < target_today:
-            return target_today
-        return target_today + timedelta(days=1)
-
-    def _advance_interval_next_run(self) -> None:
-        assert self.interval_seconds is not None
-        assert self.next_run is not None
+    
+    def get_next_run(self):
         now = datetime.now()
-
-        # Catch up if process wakes up late.
         while self.next_run <= now:
             self.next_run += timedelta(seconds=self.interval_seconds)
 
-    def start(self) -> None:
-        """Blocking loop. Call in main thread or a background thread."""
-        while True:
-            if self.run_at is not None:
-                next_run = self._next_daily_run_time()
-            else:
-                assert self.next_run is not None
-                next_run = self.next_run
 
-            wait_seconds = (next_run - datetime.now()).total_seconds()
+    # 定期执行任务
+    def start_interval(self):
+        while True:
+            wait_seconds = (self.next_run - datetime.now()).total_seconds()
             if wait_seconds > 0:
                 time.sleep(min(wait_seconds, self.check_interval_seconds))
                 continue
-
             try:
                 self.job()
             except Exception as exc:  # pragma: no cover
-                if self.on_error:
-                    self.on_error(exc)
-                else:
-                    print(f"[Monitor] job error: {exc}")
-
-            if self.run_at is None:
-                self._advance_interval_next_run()
-            else:
-                # Avoid duplicate execution inside the same second.
-                time.sleep(1.0)
+                print(f"[Monitor] job error: {exc}")
+            self.get_next_run()
 
 
-def run_daily(run_at: str, job: Callable[[], None]) -> None:
-    Monitor(run_at=run_at, job=job).start()
+def run_interval(
+    interval: Union[int, float, timedelta],
+    job: Callable[[], None],
+    start_at: Optional[Union[str, datetime]] = None,
+) -> None:
+    Monitor(interval=interval, start_at=start_at, job=job).start_interval()
 
 
-def run_interval(interval, job, start_at):
-    Monitor(interval=interval, start_at=start_at, job=job).start()
+def _add_trade_to_path() -> Path:
+    wxbot_dir = Path(__file__).resolve().parent
+    trade_dir = wxbot_dir.parent / "Trade"
+    if str(trade_dir) not in sys.path:
+        sys.path.insert(0, str(trade_dir))
+    return trade_dir
+
+
+def send_hourly_trade_chart(
+    wx,
+    who: str = "fzx",
+    symbol: str = "BTCUSDT",
+    anchor_hour: Optional[datetime] = None,
+) -> str:
+    trade_dir = _add_trade_to_path()
+    from draw.candlestick_drawer import CandlestickDrawer
+
+    anchor = (anchor_hour or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    drawer = CandlestickDrawer(symbol=symbol, interval="1h")
+    chart_path = drawer.plot_hourly_dual_timeframe(
+        anchor_hour=anchor,
+        save_path=trade_dir / "draw" / "output" / f"{symbol}_dual_hourly.png",
+        show=False,
+        y_mode="price",
+    )
+    stats = drawer.get_last_1h_stats(anchor_hour=anchor)
+    summary = (
+        f"{symbol} 最近1小时K线（{stats['start']:%H:%M}-{stats['end']:%H:%M}）\n"
+        f"振幅: {stats['amplitude_pct']:.2f}%\n"
+        f"涨跌幅: {stats['change_pct']:.2f}%\n"
+        f"收盘价: {stats['close']:.4f}"
+    )
+    wx.SendMsg(summary, who=who)
+    wx.SendFiles(chart_path, who=who)
+    return chart_path
 
 
 if __name__ == "__main__":
@@ -141,9 +122,15 @@ if __name__ == "__main__":
     wx = WeChat(debug=True)
 
     def send_interval_message() -> None:
-        wx.SendMsg("定时提醒：每5s发送一次。", who="wyk")
-        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sent")
+        chart_path = send_hourly_trade_chart(wx=wx, who="fzx", symbol="BTCUSDT")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sent chart: {chart_path}")
 
-    # Example: from now, run every 5 minutes.
-    run_interval(interval=5, job=send_interval_message, start_at=datetime.now())
-    # run_interval(interval=5 * 60, job=send_interval_message, start_at=datetime.now())
+    send_interval_message()
+    exit()
+
+    now = datetime.now()
+    this_hour = now.replace(minute=0, second=0, microsecond=0)
+    first_run = this_hour if now == this_hour else this_hour + timedelta(hours=1)
+
+    # Run every hour on the hour.
+    run_interval(interval=60 * 60, job=send_interval_message, start_at=first_run)

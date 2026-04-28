@@ -17,9 +17,13 @@ def print_now_windows():
         print(f"{msg.sender}: {msg.content}")
 
 
-def send(message, name="戒不了色吧", members=None):
+def send(message, name, members=None):
     wx.SendMsg(message, who=name, at=members)
     print(f"Send Success to {name}:\n\t{message}")
+
+def send_file(path, name):
+    wx.SendFiles(path, who=name)
+    print(f"Send Success to {name}:\n\t{path}")
 
 
 def print_sessions():
@@ -63,5 +67,7 @@ if __name__ == "__main__":
     # addListen("田亦海")
     # addListen("什么档次和我一组")
     # addListen("戒不了色吧")
-    addListen("fzx")
+    # addListen("fzx")
+    path="C:\\Users\\61591\\Pictures\\c99d76dc125bf90575e4cbd7334c019.jpg"
+    send_file(path, "fzx")
     wx.KeepRunning()
