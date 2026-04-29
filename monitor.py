@@ -8,12 +8,6 @@ from typing import Callable, Optional, Union
 
 
 class Monitor:
-    """
-    Run a callback by either:
-    1) daily fixed time: run_at="HH:MM[:SS]"
-    2) interval schedule: start_at + interval (seconds or timedelta)
-    """
-
     def __init__(
         self,
         job: Callable[[], None],
@@ -22,25 +16,18 @@ class Monitor:
         check_interval_seconds: float = 1.0,
     ):
         self.job = job
-        self.check_interval_seconds = max(0.2, check_interval_seconds)
-
-        self.interval_seconds: Optional[float] = None
-        self.next_run: Optional[datetime] = None
+        self.check_interval_seconds = max(50, check_interval_seconds)
 
         self.interval_seconds = self._parse_interval_seconds(interval)
         self.next_run = self._parse_start_time(start_at)
 
+        print(f"[Monitor] initialized with interval={self.interval_seconds} seconds, start_at={self.next_run}")
+
     @staticmethod
     def _parse_interval_seconds(interval: Optional[Union[int, float, timedelta]]) -> float:
-        if interval is None:
-            raise ValueError("interval is required in interval mode")
         if isinstance(interval, timedelta):
-            seconds = interval.total_seconds()
-        else:
-            seconds = float(interval)
-        if seconds <= 0:
-            raise ValueError("interval must be > 0")
-        return seconds
+            return interval.total_seconds()
+        return float(interval)
 
     @staticmethod
     def _parse_start_time(start_at: Optional[Union[str, datetime]]) -> datetime:
@@ -55,12 +42,14 @@ class Monitor:
         now = datetime.now()
         while self.next_run <= now:
             self.next_run += timedelta(seconds=self.interval_seconds)
+        print(f"[Monitor] next run scheduled at {self.next_run}")
 
 
     # 定期执行任务
     def start_interval(self):
         while True:
             wait_seconds = (self.next_run - datetime.now()).total_seconds()
+            print(f"[Monitor] waiting for {wait_seconds:.2f} seconds until next run at {self.next_run}")
             if wait_seconds > 0:
                 time.sleep(min(wait_seconds, self.check_interval_seconds))
                 continue
@@ -70,13 +59,6 @@ class Monitor:
                 print(f"[Monitor] job error: {exc}")
             self.get_next_run()
 
-
-def run_interval(
-    interval: Union[int, float, timedelta],
-    job: Callable[[], None],
-    start_at: Optional[Union[str, datetime]] = None,
-) -> None:
-    Monitor(interval=interval, start_at=start_at, job=job).start_interval()
 
 
 def _add_trade_to_path() -> Path:
@@ -92,6 +74,7 @@ def send_hourly_trade_chart(
     who: str = "fzx",
     symbol: str = "BTCUSDT",
     anchor_hour: Optional[datetime] = None,
+    min_amplitude_pct: float = 0.5,
 ) -> str:
     trade_dir = _add_trade_to_path()
     from draw.candlestick_drawer import CandlestickDrawer
@@ -105,6 +88,13 @@ def send_hourly_trade_chart(
         y_mode="price",
     )
     stats = drawer.get_last_1h_stats(anchor_hour=anchor)
+    if float(stats["amplitude_pct"]) <= min_amplitude_pct:
+        print(
+            f"[{datetime.now():%Y-%m-%d %H:%M:%S}] skip send: "
+            f"{symbol} 振幅 {stats['amplitude_pct']:.2f}% <= {min_amplitude_pct:.2f}%"
+        )
+        return ""
+
     summary = (
         f"{symbol} 最近1小时K线（{stats['start']:%H:%M}-{stats['end']:%H:%M}）\n"
         f"振幅: {stats['amplitude_pct']:.2f}%\n"
@@ -122,15 +112,12 @@ if __name__ == "__main__":
     wx = WeChat(debug=True)
 
     def send_interval_message() -> None:
-        chart_path = send_hourly_trade_chart(wx=wx, who="fzx", symbol="BTCUSDT")
-        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sent chart: {chart_path}")
-
-    send_interval_message()
-    exit()
+        chart_path = send_hourly_trade_chart(wx=wx, who="币圈战神", symbol="BTCUSDT", min_amplitude_pct=0.5)
+        if chart_path:
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sent chart: {chart_path}")
 
     now = datetime.now()
     this_hour = now.replace(minute=0, second=0, microsecond=0)
     first_run = this_hour if now == this_hour else this_hour + timedelta(hours=1)
-
-    # Run every hour on the hour.
-    run_interval(interval=60 * 60, job=send_interval_message, start_at=first_run)
+    # send_interval_message()  # 先执行一次
+    Monitor(job=send_interval_message, interval=60 * 60, start_at=first_run).start_interval()
