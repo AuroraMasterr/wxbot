@@ -16,7 +16,8 @@ class Monitor:
         check_interval_seconds: float = 1.0,
     ):
         self.job = job
-        self.check_interval_seconds = max(50, check_interval_seconds)
+        # 默认至少10分钟检查一次，避免频繁检查导致资源浪费
+        self.check_interval_seconds = max(600, check_interval_seconds)
 
         self.interval_seconds = self._parse_interval_seconds(interval)
         self.next_run = self._parse_start_time(start_at)
@@ -81,9 +82,15 @@ def send_hourly_trade_chart(
 
     anchor = (anchor_hour or datetime.now()).replace(minute=0, second=0, microsecond=0)
     drawer = CandlestickDrawer(symbol=symbol, interval="1h")
-    chart_path = drawer.plot_hourly_dual_timeframe(
+    # chart_path = drawer.plot_hourly_dual_timeframe(
+    #     anchor_hour=anchor,
+    #     save_path=trade_dir / "draw" / "output" / f"{symbol}_dual_hourly.png",
+    #     show=False,
+    #     y_mode="price",
+    # )
+    chart_path = drawer.plot_hourly_triple_timeframe_split(
         anchor_hour=anchor,
-        save_path=trade_dir / "draw" / "output" / f"{symbol}_dual_hourly.png",
+        save_path=trade_dir / "draw" / "output" / f"{symbol}_triple_hourly.png",
         show=False,
         y_mode="price",
     )
@@ -113,11 +120,12 @@ if __name__ == "__main__":
 
     def send_interval_message() -> None:
         chart_path = send_hourly_trade_chart(wx=wx, who="币圈战神", symbol="BTCUSDT", min_amplitude_pct=0.5)
+        # chart_path = send_hourly_trade_chart(wx=wx, who="fzx", symbol="BTCUSDT", min_amplitude_pct=0.5)
         if chart_path:
             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sent chart: {chart_path}")
 
     now = datetime.now()
     this_hour = now.replace(minute=0, second=0, microsecond=0)
     first_run = this_hour if now == this_hour else this_hour + timedelta(hours=1)
-    # send_interval_message()  # 先执行一次
+    send_interval_message()  # 先执行一次
     Monitor(job=send_interval_message, interval=60 * 60, start_at=first_run).start_interval()
